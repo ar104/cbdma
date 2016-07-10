@@ -42,7 +42,7 @@ void convert_float()
 int main(int argc, char *argv[])
 {
   if(argc != 3) {
-    printf("Usage: %s infile outfile", argv[0]);
+    printf("Usage: %s infile outfile\n", argv[0]);
     exit(-1);
   }
   FILE *fd_in = fopen(argv[1], "r");

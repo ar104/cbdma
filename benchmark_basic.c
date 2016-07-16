@@ -1,35 +1,10 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-#include"select.h"
-#include<sys/types.h>
-#include<unistd.h>
-#include<sys/stat.h>
-#include<fcntl.h>
-#include<sys/mman.h>
-#include<sys/time.h>
+#include"lz4_mt.h"
 
 static unsigned long get_current_rtc()
 {
   struct timeval tm;
   gettimeofday(&tm, NULL);
   return tm.tv_sec*1000000 + tm.tv_usec;
-}
-
-void *map_output(unsigned long size)
-{
-  void *space = mmap(NULL, size > 0 ? size : 4096,
-                     PROT_READ | PROT_WRITE,
-                     MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-  if (space == MAP_FAILED) {
-    printf("map output failed\n");
-    exit(-1);
-  }
-  if (mlock(space, size) < 0) {
-    printf("mlock output failed\n");
-    exit(-1);
-  }
-  return space;
 }
 
 void *map_file(const char *fname, unsigned long* sizep)
@@ -62,7 +37,7 @@ void run_date_select(const char *fname, unsigned long dleft, unsigned long drigh
 {
   unsigned long size;
   sales_table_row_t *data = (sales_table_row_t *)map_file(fname, &size);
-  sales_table_row_t *output = (sales_table_row_t *)map_output(size);
+  sales_table_row_t *output = (sales_table_row_t *)map_anon_memory(size);
   unsigned long input_size = size; 
   sales_table_row_t *output_start = output;
   unsigned long start_time = get_current_rtc();

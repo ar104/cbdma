@@ -1,4 +1,5 @@
 #include"lz4_mt.h"
+#include<pthread.h>
 
 static unsigned long get_current_rtc()
 {
@@ -33,14 +34,12 @@ void *map_file(const char *fname, unsigned long* sizep)
   return mapped_file;
 }
 
-void run_date_select(const char *fname, unsigned long dleft, unsigned long dright)
+sales_table_row_t* run_date_select(sales_table_row_t *data,
+				   unsigned long size,
+				   sales_table_row_t *output,
+				   unsigned long dleft,
+				   unsigned long dright)
 {
-  unsigned long size;
-  sales_table_row_t *data = (sales_table_row_t *)map_file(fname, &size);
-  sales_table_row_t *output = (sales_table_row_t *)map_anon_memory(size);
-  unsigned long input_size = size; 
-  sales_table_row_t *output_start = output;
-  unsigned long start_time = get_current_rtc();
   while(size  >= sizeof(sales_table_row_t)) {
     int e = select_year(data, dleft, dright);
     if(e) {
@@ -50,12 +49,45 @@ void run_date_select(const char *fname, unsigned long dleft, unsigned long drigh
     data++;
     size -= sizeof(sales_table_row_t);
   }
+  return output;
+}
+
+typedef struct {
+  sales_table_row_t *volatile data_in;
+  volatile unsigned long size;
+  sales_table_row_t *data_out;
+  volatile bool busy;
+  volatile bool eof;
+  unsigned long dleft;
+  unsigned long dright;
+} channel_t;
+  
+void* consumer(void * arg)
+{
+  channel_t *channel = (channel_t *)arg;
+  sales_table_row_t *output_start = channel->data_out;
+  unsigned long start_time = get_current_rtc();
+  unsigned long total_input_size = 0;
+  while(!channel->eof) {
+    while(!channel->busy);
+    if(channel->eof)
+      break;
+    total_input_size += channel->size;
+    channel->data_out = run_date_select(channel->data_in,
+					channel->size,
+					channel->data_out,
+					channel->dleft,
+					channel->dright);
+    channel->busy = false;
+  }
   unsigned long stop_time = get_current_rtc();
   printf("Size = %lu Selectivity=%lf Throughput = %lf GB/s\n",
-	 input_size,
-	 (sizeof(sales_table_row_t)*(output - output_start))/((double)input_size),
-	 ((double)input_size)/(1000*(stop_time - start_time)));
+	 total_input_size,
+	 (sizeof(sales_table_row_t)*(channel->data_out - output_start))/((double)total_input_size),
+	 ((double)total_input_size)/(1000*(stop_time - start_time)));
+  return NULL;
 }
+
 
 int main(int argc, char *argv[])
 {
@@ -65,6 +97,21 @@ int main(int argc, char *argv[])
     exit(-1);
   }
   if(atoi(argv[1]) == 1) {
-    run_date_select(argv[2], atol(argv[3]), atol(argv[4]));
+    channel_t channel;
+    pthread_t exec_thread;
+    channel.data_in  = (sales_table_row_t *)map_file(argv[2],
+						     (unsigned long *)&channel.size);
+    channel.data_out = (sales_table_row_t *)map_anon_memory(channel.size);
+    channel.dleft = atol(argv[3]);
+    channel.dright = atol(argv[4]);
+    channel.busy = true;
+    if(pthread_create(&exec_thread, NULL, consumer, &channel) != 0) {
+      printf("failed to launch exec thread\n");
+      exit(-1);
+    }
+    while(channel.busy);
+    channel.eof = true;
+    channel.busy = true;
+    pthread_join(exec_thread, NULL);
   }
 }

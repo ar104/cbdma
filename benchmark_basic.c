@@ -41,9 +41,9 @@ sales_table_row_t* run_date_select(sales_table_row_t *data,
 				   unsigned long dright)
 {
   while(size  >= sizeof(sales_table_row_t)) {
-    int e = select_year(data, dleft, dright);
+    volatile int e = select_year(data, dleft, dright);
     if(e) {
-      memcpy(output, data, sizeof(sales_table_row_t));
+      //memcpy(output, data, sizeof(sales_table_row_t));
       output++;
     }
     data++;
@@ -66,25 +66,27 @@ void* consumer(void * arg)
 {
   channel_t *channel = (channel_t *)arg;
   sales_table_row_t *output_start = channel->data_out;
-  unsigned long start_time = get_current_rtc();
+  unsigned long start_time;
   unsigned long total_input_size = 0;
+  unsigned long total_time = 0;
   while(!channel->eof) {
     while(!channel->busy);
     if(channel->eof)
       break;
+    start_time = get_current_rtc();
     total_input_size += channel->size;
     channel->data_out = run_date_select(channel->data_in,
 					channel->size,
 					channel->data_out,
 					channel->dleft,
 					channel->dright);
+    total_time += (get_current_rtc() - start_time);
     channel->busy = false;
   }
-  unsigned long stop_time = get_current_rtc();
   printf("Size = %lu Selectivity=%lf Throughput = %lf GB/s\n",
 	 total_input_size,
 	 (sizeof(sales_table_row_t)*(channel->data_out - output_start))/((double)total_input_size),
-	 ((double)total_input_size)/(1000*(stop_time - start_time)));
+	 ((double)total_input_size)/(1000*total_time));
   return NULL;
 }
 
@@ -104,14 +106,19 @@ int main(int argc, char *argv[])
     channel.data_out = (sales_table_row_t *)map_anon_memory(channel.size);
     channel.dleft = atol(argv[3]);
     channel.dright = atol(argv[4]);
-    channel.busy = true;
+    channel.busy = false;
+    channel.eof = false;
     if(pthread_create(&exec_thread, NULL, consumer, &channel) != 0) {
       printf("failed to launch exec thread\n");
       exit(-1);
     }
+    unsigned long start_time = get_current_rtc();
+    channel.busy = true;
     while(channel.busy);
+    unsigned long total_time = get_current_rtc() - start_time;
     channel.eof = true;
     channel.busy = true;
     pthread_join(exec_thread, NULL);
+    printf("TIME = %lu\n", total_time);
   }
 }

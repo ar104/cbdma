@@ -15,12 +15,12 @@ static __inline__ unsigned long rdtsc(void)
 #define LINESIZE 64
 
 volatile char *space;
-char total;
+char total = 0;
 
 void loop()
 {
   for(unsigned long index = 0; index < SIZE; index+=LINESIZE) {
-    total += space[index];
+    total = total + space[index];
   }
 }
 
@@ -39,9 +39,9 @@ main()
   for(int loops=0;loops < LOOPS;loops++) {
     loop();
   }
-  printf("DUMMY %d\n", (int)total);
   unsigned long total_time = rdtsc() - start;
-  unsigned long total_bytes = SIZE*LOOPS*LINESIZE;
+  unsigned long total_bytes = SIZE*LOOPS;
   double bw = ((double)total_bytes)/(total_time);
+  printf("DUMMY %d\n", (int)total);
   printf("BW = %lf B/cycle\n", bw);
 }

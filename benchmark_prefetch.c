@@ -100,7 +100,6 @@ void* consumer(void * arg)
 typedef struct {
   int me;
   char * volatile range_start;
-  char * volatile range2_start;
   volatile unsigned long range_size;
   volatile bool busy;
   volatile bool terminate;
@@ -124,11 +123,8 @@ void * prefetch(void *arg)
     while(p->range_size) {
       unsigned long chunk = (p->range_size  > 64) ? 64:p->range_size;
       total = total + *p->range_start;
-      //__builtin_prefetch(p->range_start, 0, 1);
-      //__builtin_prefetch(p->range2_start, 1, 2);
       p->range_size  -= chunk;
       p->range_start += chunk;
-      p->range2_start += chunk;
     }
     p->busy = false;
   }
@@ -136,7 +132,6 @@ void * prefetch(void *arg)
 }
 
 void do_prefetch(char *range,
-		 char *range2,
 		 unsigned long size,
 		 prefetch_t *prefetchers,
 		 int prefetchers_cnt)
@@ -144,12 +139,10 @@ void do_prefetch(char *range,
   unsigned long chunk = size/prefetchers_cnt;
   for(int i=0;i<prefetchers_cnt;i++) {
     prefetchers[i].range_start = range;
-    prefetchers[i].range2_start = range2;
     prefetchers[i].range_size  = chunk;
     if(i == prefetchers_cnt)
       prefetchers[i].range_size += size %prefetchers_cnt;
     range  += prefetchers[i].range_size;
-    range2 += prefetchers[i].range_size; 
     prefetchers[i].busy = true;
   }
   for(int i=0;i<prefetchers_cnt;i++) {
@@ -204,7 +197,6 @@ int main(int argc, char *argv[])
       data_out += (round_size/sizeof(sales_table_row_t));
       if(size > 0)
 	do_prefetch((char *)data_in,
-		    data_out,
 		    size > chunksize ? chunksize:size,
 		    prefetchers,
 		    prefetch_cores);

@@ -1,6 +1,6 @@
 .PHONY:all
 
-all: convert_store_sales lz4comp_mt
+all: convert_store_sales benchmark benchmark_prefetch mem_bw calibrate_tsc
 
 CFLAGS=-O3
 
@@ -11,9 +11,17 @@ CC=g++
 convert_store_sales: convert_store_sales.c
 	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
 
-lz4comp_mt: lz4comp_mt.cpp
-	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
+benchmark: benchmark.c
+	$(CC) $(CFLAGS) $^ -lpthread -o $@
 
+benchmark_prefetch: benchmark_prefetch.c
+	$(CC) $(CFLAGS) $^ -lpthread -o $@
+
+calibrate_tsc:calibrate_tsc.c
+	$(CC) $(CFLAGS) $^ -o $@
+
+mem_bw: mem_bw.cpp
+	$(CXX) $(CFLAGS) $^ -lpthread -o $@
 
 clean:
-	rm -f convert_store_sales lz4comp_mt *.o
+	rm -f convert_store_sales benchmark benchmark_prefetch mem_bw calibrate_tsc

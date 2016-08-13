@@ -1,6 +1,6 @@
 .PHONY:all
 
-all: convert_store_sales benchmark benchmark_prefetch mem_bw calibrate_tsc lz4comp_mt
+all: convert_store_sales benchmark benchmark_prefetch mem_bw calibrate_tsc lz4comp_mt lz4uncomp_mt
 
 CFLAGS=-O3
 

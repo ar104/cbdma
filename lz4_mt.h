@@ -23,6 +23,28 @@
 
 const int MAGICNUMBER_SIZE = 4;
 
+static void read_from_file(int fd,
+                           unsigned char *input,
+                           unsigned long bytes_to_read) {
+  while (bytes_to_read) {
+    unsigned long bytes_read = read(fd, input, bytes_to_read);
+    if (bytes_read == -1UL) {
+      if (errno != EAGAIN) {
+	printf("Stream readin unsuccessful: %s", strerror(errno));
+        exit(-1);
+      }
+    }
+    else if (bytes_read == 0) {
+      // Note: silently return if EOF
+      break;
+    }
+    else {
+      input += bytes_read;
+      bytes_to_read -= bytes_read;
+    }
+  }
+}
+
 static void write_to_file(int fd,
                           unsigned char *output,
                           unsigned long bytes_to_write) {
@@ -47,7 +69,7 @@ class lz4_uncompression_work {
     unsigned long total_comp_bytes;
     
 public:
-    char *fd_in;
+    int fd_in;
     unsigned long fillbytes;
     unsigned char *comp_data;
     unsigned long comp_bytes;
@@ -57,7 +79,8 @@ public:
     volatile unsigned long uncomp_bytes;
     unsigned long total_uncomp_time;
     volatile bool busy;
-
+    volatile bool terminate;
+    
     lz4_uncompression_work() {
       total_comp_bytes = 0;
       fillbytes = 0;
@@ -69,6 +92,7 @@ public:
       uncomp_offset = 0;
       total_uncomp_time = 0;
       busy = false;
+      terminate = false;
     }
 
     unsigned long startup(unsigned char *magic_bytes) {
@@ -145,8 +169,7 @@ public:
       if (next) {
         comp_bytes = next; // Don't show the size
         next += 4;
-	memcpy(comp_data, fd_in, next);
-	fd_in += next;
+	read_from_file(fd_in, comp_data, next);
 	unsigned int next_block_size = *(unsigned int *) (comp_data + next - 4);
         return next_block_size;
       }

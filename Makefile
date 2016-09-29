@@ -4,8 +4,7 @@ all: convert_store_sales benchmark benchmark_prefetch mem_bw calibrate_tsc lz4co
 
 CFLAGS=-O3
 
-LIBS = -lc -lcyclone -lcraft -lzmq -lboost_system -lboost_date_time -lpmemobj -lpmem -lpthread -lboost_thread -llz4
-
+LIBS = -lc -lpthread
 CC=g++
 
 convert_store_sales: convert_store_sales.c
